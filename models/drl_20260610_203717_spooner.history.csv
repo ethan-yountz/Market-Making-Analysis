@@ -1,0 +1,3 @@
+step,val_games,val_total_pnl_usd,val_mean_pnl_per_game_usd,val_median_pnl_per_game_usd,val_game_sharpe,val_win_rate,val_total_fees_usd,val_spread_captured_usd,val_inventory_pnl_usd,val_mean_abs_inv,val_max_abs_inv,val_mean_terminal_abs_inv,val_fills_per_game,val_maker_qty_per_game,val_latent_qty_share,val_worst_game_usd,val_best_game_usd
+6000,8,-80.28,-10.035,-8.4825,-1.1452248348917429,0.125,76.66,60.1425,-41.605,334.4797950480297,500.0,342.9375,43.25,1311.75,0.0,-20.595,1.99
+12000,8,-70.425,-8.803125,-9.755,-1.0172924274870638,0.25,72.12,57.3375,-31.95,252.12797156166027,500.0,366.75,38.5,1094.5625,0.0,-21.695,1.19

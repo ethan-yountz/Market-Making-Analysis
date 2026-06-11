@@ -47,6 +47,25 @@ N_ACTIONS = len(LADDER) + 4
 N_FEATURES = 6
 
 
+def ladder_quotes(action: int, s: MarketState, size: float, band_c: float) -> QuoteSet:
+    """Shared action -> QuoteSet mapping (used by Spooner and the DRL env)."""
+    m = s.mid_c
+    if math.isnan(m) or m < 1 + band_c or m > 99 - band_c:
+        return QuoteSet(None, None)
+    bid_ref = s.bid_c if not math.isnan(s.bid_c) else m - 1
+    ask_ref = s.ask_c if not math.isnan(s.ask_c) else m + 1
+    if action == A_CLEAR:
+        return QuoteSet(None, None, clear=True)
+    if action == A_NOQUOTE:
+        return QuoteSet(None, None)
+    if action == A_BID_ONLY:
+        return QuoteSet(Quote(bid_ref, size), None)
+    if action == A_ASK_ONLY:
+        return QuoteSet(None, Quote(ask_ref, size))
+    ob, oa = LADDER[action]
+    return QuoteSet(Quote(bid_ref - ob, size), Quote(ask_ref + oa, size))
+
+
 class TileCoder:
     """Classic tile coding over [0,1]^D with hashed indices."""
 
@@ -162,22 +181,7 @@ class SpoonerMM(Strategy):
     # ------------------------------------------------------------ acting
 
     def _quotes_for(self, action: int, s: MarketState) -> QuoteSet:
-        m = s.mid_c
-        if math.isnan(m) or m < 1 + self.cfg.no_quote_band_c or m > 99 - self.cfg.no_quote_band_c:
-            return QuoteSet(None, None)
-        bid_ref = s.bid_c if not math.isnan(s.bid_c) else m - 1
-        ask_ref = s.ask_c if not math.isnan(s.ask_c) else m + 1
-        size = self.cfg.size
-        if action == A_CLEAR:
-            return QuoteSet(None, None, clear=True)
-        if action == A_NOQUOTE:
-            return QuoteSet(None, None)
-        if action == A_BID_ONLY:
-            return QuoteSet(Quote(bid_ref, size), None)
-        if action == A_ASK_ONLY:
-            return QuoteSet(None, Quote(ask_ref, size))
-        ob, oa = LADDER[action]
-        return QuoteSet(Quote(bid_ref - ob, size), Quote(ask_ref + oa, size))
+        return ladder_quotes(action, s, self.cfg.size, self.cfg.no_quote_band_c)
 
     def on_event(self, state: MarketState) -> QuoteSet | None:
         if math.isnan(state.mid_c):
