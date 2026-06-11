@@ -1,0 +1,20 @@
+# Credentials — never commit
+/secrets/
+
+# Data stores (large, regenerable from API / recorder)
+/data/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.ipynb_checkpoints/
+.pytest_cache/
+results/
+*.log

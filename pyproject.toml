@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kalshi-mm"
+version = "0.1.0"
+description = "Market-making strategy research on Kalshi pregame sports moneylines"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    "websockets>=12",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    "pyarrow>=14",
+    "cryptography>=42",
+    "gymnasium>=0.29",
+]
+# torch is intentionally NOT listed: install the CUDA build separately
+# (already present on this machine: torch 2.11.0+cu128).
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "jupyter"]
+
+[tool.setuptools.packages.find]
+include = ["kalshi_mm*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
