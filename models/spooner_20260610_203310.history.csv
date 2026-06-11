@@ -1,0 +1,3 @@
+epoch,mean_psi,val_games,val_total_pnl_usd,val_mean_pnl_per_game_usd,val_median_pnl_per_game_usd,val_game_sharpe,val_win_rate,val_total_fees_usd,val_spread_captured_usd,val_inventory_pnl_usd,val_mean_abs_inv,val_max_abs_inv,val_mean_terminal_abs_inv,val_fills_per_game,val_maker_qty_per_game,val_latent_qty_share,val_worst_game_usd,val_best_game_usd
+0,-51.35997916666666,15,-195.905,-13.060333333333332,-14.325,-1.1631810984635085,0.13333333333333333,171.62,164.2075,-137.0425,324.5804789305117,500.0,332.76666666666665,40.4,1445.7333333333333,0.0,-29.61,8.125
+1,-36.4015625,15,-189.72,-12.648,-9.355,-1.1177305255360486,0.13333333333333333,180.78,161.1375,-112.395,300.1803598486214,500.0,361.0,41.333333333333336,1484.8,0.0,-31.4,8.055
