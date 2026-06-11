@@ -305,6 +305,12 @@ def episode(
             else:
                 fill_eng.tape_volume += ev.trade_count
         else:  # book update
+            if not math.isnan(mid):
+                # Snapshot at the pre-update mid so the PnL decomposition
+                # attributes the upcoming mid jump to the inventory actually
+                # held through it (fills from the elapsed span included).
+                curve_rows.append({"ts": ts, "mid_c": mid, "inventory": inv,
+                                   "cash_c": cash, "equity_c": cash + inv * mid})
             hist_bid = ev.bid if not pd.isna(ev.bid) else math.nan
             hist_ask = ev.ask if not pd.isna(ev.ask) else math.nan
             if not (math.isnan(hist_bid) or math.isnan(hist_ask)):
