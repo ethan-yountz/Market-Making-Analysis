@@ -31,38 +31,63 @@ class Fill:
     layer: str            # "tape" | "latent" | "terminal"
 
 
-class IntensityModel:
-    """lambda(delta) in fills/second at delta cents from mid; A is the rate of
-    marketable flow reaching the mid itself. Defaults are deliberately modest
-    placeholders until calibrated from the train season."""
+TOUCH_DEPTH_C = 0.5  # a touch quote in a 1-tick book sits half a tick from mid
 
-    def __init__(self, A_per_min: float = 0.6, k_per_cent: float = 1.1):
-        self.A = A_per_min / 60.0
-        self.k = k_per_cent
+
+class IntensityModel:
+    """Piecewise-exponential fill intensity around the touch depth.
+
+        lambda(d) = R * exp(-k_out * (d - 0.5))   for d >= 0.5  (calibrated)
+        lambda(d) = R * exp(+k_in  * (0.5 - d))   for d <  0.5  (assumption)
+
+    R is the per-side marketable arrival rate: every observed trade reached at
+    least the touch, so a touch quote sees rate R by construction. Beyond the
+    touch, decay k_out is identified from the tape's depth distribution.
+    Inside the touch (only reachable when the spread is >= 2c) there is no
+    historical flow to learn from — k_in is a capped demand-elasticity
+    assumption (default: improving by a full tick ~doubles flow), reported as
+    a sensitivity, never extrapolated from k_out.
+    """
+
+    def __init__(
+        self,
+        R_per_min: float = 0.6,
+        k_out: float = 1.5,
+        k_in: float = 1.4,
+    ):
+        self.R_per_min = R_per_min
+        self.k_out = k_out
+        self.k_in = k_in
+
+    def params(self, t_to_tip_s: float | None) -> tuple[float, float]:
+        """(R_per_min, k_out) at this horizon."""
+        return self.R_per_min, self.k_out
 
     def rate(self, delta_c: float, t_to_tip_s: float | None = None) -> float:
-        return self.A * math.exp(-self.k * max(delta_c, 0.0))
+        r_min, k_out = self.params(t_to_tip_s)
+        d = max(delta_c, 0.0)
+        if d >= TOUCH_DEPTH_C:
+            lam = r_min * math.exp(-k_out * (d - TOUCH_DEPTH_C))
+        else:
+            lam = r_min * math.exp(self.k_in * (TOUCH_DEPTH_C - d))
+        return lam / 60.0
 
 
 class BucketedIntensity(IntensityModel):
-    """(A, k) by hours-to-tip bucket, as produced by calib/intensity.py."""
+    """(R, k_out) by hours-to-tip bucket, as produced by calib/intensity.py."""
 
-    def __init__(self, buckets: list[tuple[float, float, float]]):
-        # buckets: sorted [(max_hours_to_tip, A_per_min, k_per_cent), ...]
+    def __init__(self, buckets: list[tuple[float, float, float]], k_in: float = 1.4):
+        # buckets: [(max_hours_to_tip, R_per_min, k_out), ...]
+        super().__init__(k_in=k_in)
         self.buckets = sorted(buckets)
 
-    def rate(self, delta_c: float, t_to_tip_s: float | None = None) -> float:
+    def params(self, t_to_tip_s: float | None) -> tuple[float, float]:
         h = (t_to_tip_s or 0.0) / 3600.0
-        A_min, k = self.buckets[-1][1], self.buckets[-1][2]
-        for max_h, a, kk in self.buckets:
+        for max_h, r, k in self.buckets:
             if h <= max_h:
-                A_min, k = a, kk
-                break
-        return (A_min / 60.0) * math.exp(-kk_safe(k) * max(delta_c, 0.0))
-
-
-def kk_safe(k: float) -> float:
-    return max(k, 1e-6)
+                return r, max(k, 1e-6)
+        _, r, k = self.buckets[-1]
+        return r, max(k, 1e-6)
 
 
 @dataclass
