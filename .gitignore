@@ -16,5 +16,7 @@ venv/
 # Tooling
 .ipynb_checkpoints/
 .pytest_cache/
-results/
 *.log
+
+# Backtest outputs (tracked for review across machines; regenerate via 03_run_backtests.py)
+# !results/ is intentionally not ignored
