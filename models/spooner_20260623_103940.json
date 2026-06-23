@@ -1,0 +1,11 @@
+{
+  "size": 100.0,
+  "eta": 0.5,
+  "alpha": 0.02,
+  "lam": 0.85,
+  "gamma": 1.0,
+  "epsilon": 0.15,
+  "no_quote_band_c": 3.0,
+  "max_inv_norm": 500.0,
+  "seed": 5
+}
