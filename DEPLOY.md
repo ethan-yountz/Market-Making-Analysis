@@ -7,9 +7,41 @@ nightly backups to Cloudflare R2. Architecture and internals are in
 > **Heads up — credentials are not in this repo.** `secrets/` is gitignored, so
 > on a fresh machine you won't have the key files. You only need the *values*:
 > your **API key id** and your **RSA private key (PEM)**. Get them from the
-> machine where `secrets/` lives, or generate a new key pair at
-> kalshi.com → Settings → API. You configure them as Railway variables (below) —
-> the clipboard commands in step 1 only work where the `secrets/` files exist.
+> machine where `secrets/` lives, or generate a new key pair (next section).
+> You configure them as Railway variables (below) — the clipboard commands in
+> step 1 only work where the `secrets/` files exist.
+
+---
+
+## Part 0 — Get Kalshi API credentials (if you don't have them)
+
+You need two things: an **API Key ID** (a UUID) and an **RSA private key** (PEM).
+Generate them once at Kalshi:
+
+1. Log in → **Profile Settings** ([kalshi.com/account/profile](https://kalshi.com/account/profile)) → **API Keys**.
+2. Click **Create New API Key**.
+3. Kalshi shows a **Key ID** and a **Private Key** (RSA, begins
+   `-----BEGIN RSA PRIVATE KEY-----`) and downloads the private key as a `.txt`.
+   ⚠️ The private key is shown **once and never again** — save it immediately.
+   If you lose it, delete the key and create a new one.
+
+The private key never leaves your machine/host; it's only used locally to sign
+requests. **One key pair works on every machine and on Railway at the same
+time** — you don't need a separate key per machine. Only generate a new one to
+rotate or if you've lost the private key.
+
+**Where it goes:**
+- *Local runs* — create a `secrets/` folder in the repo and save:
+  - the key id → `secrets/kalshi_key_id.txt`
+  - the PEM (full contents of the downloaded `.txt`) → `secrets/kalshi_private_key.pem`
+
+  `secrets/` is gitignored — **never commit it.** Verify the key loads:
+  ```bash
+  python scripts/probe_ws.py          # should print "auth: loaded" + live messages
+  ```
+- *Railway* — paste the same two values into the `KALSHI_API_KEY_ID` /
+  `KALSHI_PRIVATE_KEY` variables in Part 1, step 4 (no `secrets/` folder needed
+  on the host).
 
 ---
 
