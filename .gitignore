@@ -1,5 +1,6 @@
 # Credentials — never commit
 /secrets/
+.env
 
 # Data stores (large, regenerable from API / recorder)
 /data/

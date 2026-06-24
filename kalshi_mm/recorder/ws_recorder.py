@@ -31,7 +31,10 @@ from kalshi_mm.recorder.discover import GAME_SERIES, discover_game_markets
 
 log = logging.getLogger(__name__)
 
-CHANNELS = ["orderbook_delta", "trade", "ticker_v2"]
+# NB: "ticker_v2" is not a valid Kalshi channel and triggers an "Unknown
+# channel name" error that rejects the whole subscription. Valid here are
+# "orderbook_delta" (snapshot + deltas) and "trade".
+CHANNELS = ["orderbook_delta", "trade"]
 
 
 class RotatingJsonlGzWriter:

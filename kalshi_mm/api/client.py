@@ -86,10 +86,19 @@ class KalshiAuth:
 
 
 def load_default_auth(secrets_dir: str | Path = "secrets") -> KalshiAuth | None:
-    """Load credentials from env (KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY_PATH)
-    or from ``secrets/kalshi_key_id.txt`` + ``secrets/kalshi_private_key.pem``.
+    """Load credentials, in priority order:
+
+    1. env ``KALSHI_API_KEY_ID`` + ``KALSHI_PRIVATE_KEY`` (raw PEM inline —
+       used on hosts like Railway with no persistent filesystem; literal
+       ``\\n`` escapes are accepted),
+    2. env ``KALSHI_API_KEY_ID`` + ``KALSHI_PRIVATE_KEY_PATH`` (file path),
+    3. ``secrets/kalshi_key_id.txt`` + ``secrets/kalshi_private_key.pem``.
+
     Returns None if absent — public endpoints still work unauthenticated."""
     key_id = os.environ.get("KALSHI_API_KEY_ID")
+    pem_env = os.environ.get("KALSHI_PRIVATE_KEY")
+    if key_id and pem_env:
+        return KalshiAuth(key_id.strip(), pem_env.replace("\\n", "\n").encode("utf-8"))
     key_path = os.environ.get("KALSHI_PRIVATE_KEY_PATH")
     if key_id and key_path and Path(key_path).exists():
         return KalshiAuth(key_id.strip(), Path(key_path).read_bytes())
