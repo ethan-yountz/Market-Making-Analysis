@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -76,18 +77,45 @@ CREATE INDEX IF NOT EXISTS idx_tr_ticker_ts ON trades (ticker, recv_ts);
 
 
 class PostgresSink(Sink):
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, connect_timeout_s: float = 600.0):
         import psycopg2  # lazy: only needed when actually using Postgres
         from psycopg2.extras import Json, execute_values
 
+        self._psycopg2 = psycopg2
         self._Json = Json
         self._execute_values = execute_values
-        self._conn = psycopg2.connect(dsn)
-        self._conn.autocommit = False
+        self._dsn = dsn
+        self._connect_timeout_s = connect_timeout_s
         self._ob: list[tuple] = []
         self._tr: list[tuple] = []
         self._n = 0
+        self._connect()
         self.ensure_schema()
+
+    def _connect(self) -> None:
+        """Connect, retrying while the server is unavailable (still in recovery,
+        restarting, …). Raises only if it stays down past the timeout."""
+        deadline = time.monotonic() + self._connect_timeout_s
+        backoff = 2.0
+        while True:
+            try:
+                self._conn = self._psycopg2.connect(self._dsn)
+                self._conn.autocommit = False
+                return
+            except self._psycopg2.OperationalError as e:
+                if time.monotonic() >= deadline:
+                    raise
+                log.warning("postgres not ready (%s); retry in %.0fs",
+                            str(e).strip().splitlines()[0][:100], backoff)
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 30.0)
+
+    def _reconnect(self) -> None:
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+        self._connect()
 
     def ensure_schema(self) -> None:
         with self._conn.cursor() as cur:
@@ -116,32 +144,45 @@ class PostgresSink(Sink):
         if len(self._tr) >= _BATCH:
             self._flush_tr()
 
-    def _flush_ob(self) -> None:
-        if not self._ob:
+    _OB_SQL = ("INSERT INTO orderbook_events (recv_ts,exch_ts,ticker,sid,seq,"
+               "msg_type,yes_levels,no_levels,best_yes_bid,best_yes_ask,delta) "
+               "VALUES %s")
+    _TR_SQL = ("INSERT INTO trades (recv_ts,exch_ts,ticker,trade_id,yes_price,"
+               "no_price,count,taker_side,raw) VALUES %s "
+               "ON CONFLICT (trade_id) DO NOTHING")
+
+    def _flush_buf(self, buf: list[tuple], sql: str) -> None:
+        """Insert + commit one buffer, reconnecting once if the connection
+        dropped. The buffer is cleared only after a successful commit, so a
+        reconnect-and-retry never loses rows."""
+        if not buf:
             return
-        with self._conn.cursor() as cur:
-            self._execute_values(cur, (
-                "INSERT INTO orderbook_events (recv_ts,exch_ts,ticker,sid,seq,"
-                "msg_type,yes_levels,no_levels,best_yes_bid,best_yes_ask,delta) "
-                "VALUES %s"), self._ob)
-        self._n += len(self._ob)
-        self._ob.clear()
+        for attempt in (1, 2):
+            try:
+                with self._conn.cursor() as cur:
+                    self._execute_values(cur, sql, buf)
+                self._conn.commit()
+                break
+            except (self._psycopg2.OperationalError, self._psycopg2.InterfaceError):
+                if attempt == 2:
+                    raise
+                log.warning("postgres connection lost; reconnecting")
+                self._reconnect()
+            except Exception:
+                self._conn.rollback()
+                raise
+        self._n += len(buf)
+        buf.clear()
+
+    def _flush_ob(self) -> None:
+        self._flush_buf(self._ob, self._OB_SQL)
 
     def _flush_tr(self) -> None:
-        if not self._tr:
-            return
-        with self._conn.cursor() as cur:
-            self._execute_values(cur, (
-                "INSERT INTO trades (recv_ts,exch_ts,ticker,trade_id,yes_price,"
-                "no_price,count,taker_side,raw) VALUES %s "
-                "ON CONFLICT (trade_id) DO NOTHING"), self._tr)
-        self._n += len(self._tr)
-        self._tr.clear()
+        self._flush_buf(self._tr, self._TR_SQL)
 
     def flush(self) -> None:
         self._flush_ob()
         self._flush_tr()
-        self._conn.commit()
 
     def close(self) -> None:
         try:
