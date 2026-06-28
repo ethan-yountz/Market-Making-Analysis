@@ -92,7 +92,29 @@ It's now recording the full MLB slate until you stop it.
 
 ---
 
-## Part 2 — Nightly backup to Cloudflare R2 (optional)
+## Part 2 — Get the data somewhere durable (pick ONE)
+
+Postgres on Railway is one fixed-size volume and a single point of failure, so
+get the data off it. Two options — the first is far less setup.
+
+### Option A (recommended for a short run) — pull to local Parquet
+No extra services, no Cloudflare. Run from your laptop whenever, and once at the
+end of collection.
+1. Railway → **Postgres service → Connect tab** → copy the **Public Network**
+   connection URL (host looks like `xxx.proxy.rlwy.net:PORT`).
+2. Export to local Parquet — incremental, so re-running only fetches new rows:
+   ```powershell
+   $env:DATABASE_URL = "postgresql://postgres:PASS@xxx.proxy.rlwy.net:PORT/railway"
+   python scripts/export_pg.py
+   ```
+   Files land in `data/lob_export/`.
+3. If Postgres gets large, reclaim space after a clean export (deletes only rows
+   already written to Parquet):
+   ```powershell
+   python scripts/export_pg.py --prune
+   ```
+
+### Option B (set-and-forget) — nightly backup to Cloudflare R2
 
 ### 6. In Cloudflare
 - Create an R2 bucket (e.g. `kalshi-lob`).
