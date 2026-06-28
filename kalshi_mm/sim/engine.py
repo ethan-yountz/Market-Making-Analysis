@@ -83,7 +83,12 @@ class Strategy:
 @dataclass
 class EngineConfig:
     max_inventory: float = 500.0
-    terminal_mode: str = "liquidate"     # "liquidate" | "carry"
+    # How leftover inventory at tip is valued:
+    #   "liquidate" — cross the spread to flatten, paying taker fees (worst case)
+    #   "settle"    — hold to expiry; inventory pays out at the realized outcome
+    #                 (100c if YES wins, else 0c), fee-free (the Kalshi reality)
+    #   "carry"     — mark remaining inventory at the last mid, no fee
+    terminal_mode: str = "liquidate"
     tick_interval_s: float = 30.0        # synthetic decision clock
     min_price_c: int = 1
     max_price_c: int = 99
@@ -325,10 +330,21 @@ def episode(
     # ------------------------------------------------------------- terminal
     end_ts = tip
     terminal_inv = inv
+    final_mid = mid  # mark price for the final equity-curve point
     if cfg.terminal_mode == "liquidate":
         do_clear(end_ts)
-    final_eq = cash + (inv * mid if not math.isnan(mid) else 0.0)
-    curve_rows.append({"ts": end_ts, "mid_c": mid, "inventory": inv,
+        final_eq = cash + (inv * mid if not math.isnan(mid) else 0.0)
+    elif cfg.terminal_mode == "settle":
+        # Hold to expiry: leftover inventory settles at the realized outcome
+        # (100c if YES wins, else 0c) with no liquidation fee. Marking the
+        # curve at the settlement price lets inventory_pnl absorb the jump so
+        # the PnL decomposition still closes.
+        settle_c = 100.0 if game.result == "yes" else 0.0
+        final_eq = cash + inv * settle_c
+        final_mid = settle_c
+    else:  # "carry": mark at last mid, no fee
+        final_eq = cash + (inv * mid if not math.isnan(mid) else 0.0)
+    curve_rows.append({"ts": end_ts, "mid_c": final_mid, "inventory": inv,
                        "cash_c": cash, "equity_c": final_eq})
     yield make_state(end_ts, done=True)
 

@@ -85,6 +85,30 @@ def test_terminal_liquidate_flattens(game):
     assert abs(res.equity["inventory"].iloc[-1]) < 1e-9
 
 
+def test_terminal_settle_marks_at_realized_outcome():
+    """Settle holds inventory to expiry: same fills, opposite outcome -> the
+    PnL differs by exactly terminal_inv * 100c (YES pays 100, NO pays 0)."""
+    cfg = EngineConfig(terminal_mode="settle")
+    fc = FillConfig(latent=False)
+    g_yes = synthetic_game(seed=1, drift_c_per_min=0.05, result="yes")
+    g_no = synthetic_game(seed=1, drift_c_per_min=0.05, result="no")
+    r_yes = run_game(g_yes, JoinTouch(), fill_config=fc, config=cfg)
+    r_no = run_game(g_no, JoinTouch(), fill_config=fc, config=cfg)
+    inv = r_yes.summary["terminal_inv"]
+    assert abs(inv) > 1e-9                                    # not flattened
+    assert abs(r_no.summary["terminal_inv"] - inv) < 1e-9    # identical fills
+    assert abs((r_yes.summary["pnl_c"] - r_no.summary["pnl_c"]) - inv * 100.0) < 1e-6
+
+
+def test_settle_decomposition_closes():
+    g = synthetic_game(seed=2, drift_c_per_min=0.05, result="yes")
+    res = run_game(g, FixedSpreadMM(half_spread_c=0.5, size=100),
+                   fill_config=FillConfig(latent=False),
+                   config=EngineConfig(terminal_mode="settle"))
+    row = game_row(res)
+    assert abs(row["decomp_residual_c"]) < 1e-6
+
+
 def test_zero_fees_join_touch_profitable_without_adverse_selection():
     """With zero fees, no drift, and symmetric uninformed flow, joining the
     touch must capture spread on net (the textbook MM case)."""

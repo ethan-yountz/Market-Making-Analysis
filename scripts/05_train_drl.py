@@ -53,6 +53,15 @@ def main() -> None:
     ap.add_argument("--reward", default="spooner", choices=["raw", "inv_penalty", "spooner"])
     ap.add_argument("--eta", type=float, default=0.5)
     ap.add_argument("--lambda-inv", type=float, default=0.001)
+    ap.add_argument("--inv-level-penalty", type=float, default=0.0005,
+                    help="per-step lambda*inv^2 inventory-level penalty (fix #3)")
+    ap.add_argument("--reward-clip", type=float, default=5.0,
+                    help="clip |per-step reward| in cents/contract; stabilizes "
+                         "the DQN against terminal/inventory spikes (fix #1)")
+    ap.add_argument("--terminal", choices=["liquidate", "settle", "carry"],
+                    default="settle",
+                    help="terminal valuation during training; 'settle' removes "
+                         "the artificial liquidation-fee spike (fix #1/#2)")
     ap.add_argument("--terminal-kappa", type=float, default=0.0)
     ap.add_argument("--frame-stack", type=int, default=32)
     ap.add_argument("--tick-seconds", type=float, default=30.0)
@@ -78,10 +87,12 @@ def main() -> None:
     logging.info("train=%d val=%d games", len(train), len(val))
 
     fill_cfg = FillConfig(rho=0.5, latent=args.latent, seed=11)
-    eng_cfg = EngineConfig(terminal_mode="liquidate", tick_interval_s=args.tick_seconds)
+    eng_cfg = EngineConfig(terminal_mode=args.terminal, tick_interval_s=args.tick_seconds)
     reward = RewardFn(RewardConfig(name=args.reward, eta=args.eta,
                                    lambda_inv=args.lambda_inv,
+                                   inv_level_penalty=args.inv_level_penalty,
                                    terminal_kappa=args.terminal_kappa,
+                                   clip=args.reward_clip,
                                    size=args.size))
     env = KalshiMMEnv(train, reward, frame_stack=args.frame_stack, size=args.size,
                       fill_config=fill_cfg, intensity=intensity,

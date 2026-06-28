@@ -61,7 +61,11 @@ def main() -> None:
     ap.add_argument("--size", type=float, default=100.0)
     ap.add_argument("--latent", action="store_true", help="enable layer-2 latent fills")
     ap.add_argument("--rho", type=float, default=0.5)
-    ap.add_argument("--terminal", choices=["liquidate", "carry"], default="liquidate")
+    ap.add_argument("--terminal", choices=["liquidate", "settle", "carry"],
+                    default="liquidate",
+                    help="value leftover inventory at tip: cross out (liquidate), "
+                         "hold to the realized outcome fee-free (settle), or mark "
+                         "at last mid (carry)")
     ap.add_argument("--out-dir", default="results")
     ap.add_argument("--base-dir", default="data/raw")
     args = ap.parse_args()

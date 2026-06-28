@@ -91,6 +91,9 @@ class TileCoder:
 class SpoonerConfig:
     size: float = 100.0
     eta: float = 0.5                 # asymmetric dampening strength
+    inv_level_penalty: float = 0.0   # per-step lambda*inv^2 (cents/contract^2):
+                                     # penalizes inventory *level* so the agent
+                                     # actively flattens instead of pinning the cap
     alpha: float = 0.02              # learning rate (per tiling)
     lam: float = 0.85                # eligibility trace decay
     gamma: float = 1.0               # undiscounted within an episode
@@ -153,7 +156,10 @@ class SpoonerMM(Strategy):
             damp = max(0.0, self.cfg.eta * self.prev_inv * dmid)
         else:
             damp = 0.0
-        return (dpnl - damp) / self.cfg.size  # ~cents per contract quoted
+        r = dpnl - damp
+        if self.cfg.inv_level_penalty:
+            r -= self.cfg.inv_level_penalty * self.prev_inv * self.prev_inv
+        return r / self.cfg.size  # ~cents per contract quoted
 
     def _update(self, r: float, idx: np.ndarray | None, action: int | None,
                 done: bool) -> None:

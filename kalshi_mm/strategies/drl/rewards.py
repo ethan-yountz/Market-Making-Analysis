@@ -20,7 +20,14 @@ class RewardConfig:
     name: str = "spooner"      # raw | inv_penalty | spooner
     eta: float = 0.5           # spooner dampening
     lambda_inv: float = 0.001  # quadratic inventory penalty (cents/contract^2)
+    inv_level_penalty: float = 0.0  # per-step lambda*inv^2 added on top of ANY
+                                    # base reward — penalizes inventory *level*,
+                                    # not just adverse moves, so the agent learns
+                                    # to actively flatten (cents/contract^2)
     terminal_kappa: float = 0.0  # extra |inv| penalty at tip (cents/contract)
+    clip: float = 0.0          # clip |reward| (cents/contract) after scaling;
+                               # 0 = off. Tames terminal-liquidation and
+                               # inventory-PnL spikes that destabilize the DQN.
     size: float = 100.0
 
 
@@ -40,7 +47,12 @@ class RewardFn:
             r -= c.lambda_inv * prev.inventory * prev.inventory
         elif c.name != "raw":
             raise ValueError(f"unknown reward {c.name}")
-        return r / c.size
+        if c.inv_level_penalty:
+            r -= c.inv_level_penalty * prev.inventory * prev.inventory
+        r /= c.size
+        if c.clip > 0.0:
+            r = max(-c.clip, min(c.clip, r))
+        return r
 
     def terminal(self, last: MarketState) -> float:
         return -self.cfg.terminal_kappa * abs(last.inventory) / self.cfg.size

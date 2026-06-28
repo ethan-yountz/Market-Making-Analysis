@@ -45,6 +45,10 @@ def main() -> None:
     ap.add_argument("--pregame-hours", type=float, default=6.0)
     ap.add_argument("--size", type=float, default=100.0)
     ap.add_argument("--eta", type=float, default=0.5)
+    ap.add_argument("--inv-level-penalty", type=float, default=0.0005,
+                    help="per-step lambda*inv^2 inventory-level penalty (fix #3)")
+    ap.add_argument("--terminal", choices=["liquidate", "settle", "carry"],
+                    default="settle")
     ap.add_argument("--eps0", type=float, default=0.15)
     ap.add_argument("--eps1", type=float, default=0.02)
     ap.add_argument("--latent", action="store_true")
@@ -68,9 +72,10 @@ def main() -> None:
     logging.info("train=%d val=%d games", len(train), len(val))
 
     fill_cfg = FillConfig(rho=0.5, latent=args.latent, seed=11)
-    eng_cfg = EngineConfig(terminal_mode="liquidate")
+    eng_cfg = EngineConfig(terminal_mode=args.terminal)
 
     agent = SpoonerMM(SpoonerConfig(size=args.size, eta=args.eta,
+                                    inv_level_penalty=args.inv_level_penalty,
                                     epsilon=args.eps0, seed=args.seed))
     history, best_val, best_path = [], -np.inf, None
     out_path = model_path()

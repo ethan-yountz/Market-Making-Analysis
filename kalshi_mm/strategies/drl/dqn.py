@@ -23,7 +23,7 @@ class DQNConfig:
     n_actions: int = 13
     frame_stack: int = 32
     hidden: int = 128
-    gamma: float = 0.999
+    gamma: float = 0.99
     n_step: int = 3
     lr: float = 3e-4
     batch_size: int = 256
