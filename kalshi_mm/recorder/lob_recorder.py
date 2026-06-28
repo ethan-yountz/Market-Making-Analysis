@@ -55,16 +55,21 @@ class LobRecorder:
         horizon_hours: float = 36.0,
         rediscover_minutes: float = 15.0,
         ws_url: str | None = None,
+        mode: str = "topbook",
+        depth_cents: int = 5,
     ):
         self.auth = auth
         self.sink = sink
         self.series = series
+        self.mode = mode  # "topbook" (near-touch, light) | "full" (snapshot+deltas)
+        self.depth_cents = depth_cents
         self.horizon_hours = horizon_hours
         self.rediscover_s = rediscover_minutes * 60.0
         self.ws_url = ws_url or DEFAULT_BASE_URL.replace("https://", "wss://") + WS_PATH
         self.rest = KalshiClient(auth=auth, rate_per_s=4)
         self._tickers: list[str] = []
         self._books: dict[str, OrderBook] = {}
+        self._last_top: dict[str, tuple] = {}  # ticker -> last written window key
         self._seq: dict[int, int] = {}  # sid -> last seq
         self._counts: Counter[str] = Counter()
         self._last_heartbeat = time.monotonic()
@@ -120,6 +125,7 @@ class LobRecorder:
         async with conn as ws:
             self._seq.clear()
             self._books.clear()
+            self._last_top.clear()
             await ws.send(json.dumps({
                 "id": 1, "cmd": "subscribe",
                 "params": {"channels": CHANNELS, "market_tickers": self._tickers},
@@ -182,17 +188,51 @@ class LobRecorder:
             book.apply_snapshot(inner)
         else:
             book.apply_delta(inner)
+        if self.mode == "topbook":
+            self._write_topbook(book, msg, inner, recv_ts)
+        else:
+            self._write_full(book, msg, inner, snapshot, recv_ts)
+
+    def _write_topbook(self, book: OrderBook, msg: dict, inner: dict, recv_ts: float) -> None:
+        """Lighter mode: write a row only when the **top of book** (best yes
+        bid/ask) moves, carrying the near-touch book (±depth_cents around the
+        spread) as a self-contained snapshot. Size churn that doesn't move the
+        touch, and all deep-book churn, write nothing — the dominant saving.
+        Every trade is still recorded separately, so executions are never lost."""
+        byb, bya = book.best_yes_bid, book.best_yes_ask
+        if byb is None or bya is None:
+            return  # need both sides to define a spread
+        key = (byb, bya)
+        if self._last_top.get(book.ticker) == key:
+            return  # touch unchanged
+        yw = book.side_window("yes", self.depth_cents)
+        nw = book.side_window("no", self.depth_cents)
+        self._last_top[book.ticker] = key
         self.sink.write_orderbook_event({
             "recv_ts": recv_ts,
             "exch_ts": _exch_iso(inner),
-            "ticker": ticker,
+            "ticker": book.ticker,
+            "sid": msg.get("sid"),
+            "seq": msg.get("seq"),
+            "msg_type": "book",
+            "yes_levels": yw,
+            "no_levels": nw,
+            "best_yes_bid": byb,
+            "best_yes_ask": bya,
+            "delta": None,
+        })
+
+    def _write_full(self, book: OrderBook, msg: dict, inner: dict,
+                    snapshot: bool, recv_ts: float) -> None:
+        """Heavy mode: full book on snapshots, compact change on deltas
+        (reconstruct offline by replaying deltas in seq order)."""
+        self.sink.write_orderbook_event({
+            "recv_ts": recv_ts,
+            "exch_ts": _exch_iso(inner),
+            "ticker": book.ticker,
             "sid": msg.get("sid"),
             "seq": msg.get("seq"),
             "msg_type": "snapshot" if snapshot else "delta",
-            # Full book only on snapshots; delta rows store just the change.
-            # Reconstruct the book offline by replaying deltas (in seq order)
-            # onto the last snapshot. Writing the whole book on every delta
-            # filled the Postgres volume within minutes.
             "yes_levels": book.yes_levels() if snapshot else None,
             "no_levels": book.no_levels() if snapshot else None,
             "best_yes_bid": book.best_yes_bid,

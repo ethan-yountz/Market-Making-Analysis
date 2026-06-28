@@ -35,6 +35,11 @@ def main() -> None:
                     help="postgres://... ; defaults to $DATABASE_URL or SQLite")
     ap.add_argument("--horizon-hours", type=float, default=36.0)
     ap.add_argument("--rediscover-mins", type=float, default=15.0)
+    ap.add_argument("--mode", choices=("topbook", "full"), default="topbook",
+                    help="topbook: near-touch book on change (light, default); "
+                         "full: full snapshots + every delta (heavy)")
+    ap.add_argument("--depth-cents", type=int, default=5,
+                    help="topbook: cents around the touch to record per side")
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -47,13 +52,16 @@ def main() -> None:
     if auth is None:
         logging.warning("no API credentials found - websocket will likely be rejected")
     sink = make_sink(args.db_url)
-    logging.info("storage sink: %s", type(sink).__name__)
+    logging.info("mode=%s depth=%dc, storage sink: %s",
+                 args.mode, args.depth_cents, type(sink).__name__)
 
     rec = LobRecorder(
         auth, sink,
         series=tuple(args.series),
         horizon_hours=args.horizon_hours,
         rediscover_minutes=args.rediscover_mins,
+        mode=args.mode,
+        depth_cents=args.depth_cents,
     )
     try:
         asyncio.run(rec.run_forever())

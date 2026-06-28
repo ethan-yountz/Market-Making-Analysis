@@ -19,19 +19,27 @@ high-fidelity backtests, we record the live book ourselves.
 
 ## What it records
 
-For each active game market it subscribes to `orderbook_delta` + `trade`,
-maintains a local book by applying the snapshot + deltas, and writes:
+For each active game market it subscribes to `orderbook_delta` + `trade` and
+maintains a local book by applying the snapshot + deltas. It runs in one of two
+modes (default **`topbook`**):
 
-- **`orderbook_events`** — one row per book change: `recv_ts`, `exch_ts`,
-  `ticker`, `sid`, `seq`, `msg_type` (`snapshot`/`delta`), and top-of-book
-  `best_yes_bid` / `best_yes_ask`. **Snapshot** rows carry the full book in
-  `yes_levels` / `no_levels` JSONB (`[[price_cents, qty], …]`); **delta** rows
-  carry only the `delta` payload (side, price, signed size) and leave the level
-  arrays null. Replay deltas onto the last snapshot (in `seq` order) to rebuild
-  the book at any instant — storing the whole book on every delta filled the
-  volume in minutes.
-- **`trades`** — one row per print: prices in cents, `count`, `taker_side`,
-  raw payload.
+- **`topbook`** (default) — writes a row only when the **top of book** (best
+  yes bid/ask) moves, capturing the near-touch book within `--depth-cents`
+  (default 5¢) of each side. That's all the fill model needs around the spread
+  and is ~30× lighter than recording everything; every trade is still kept.
+- **`full`** (`--mode full`) — snapshot rows carry the whole book; delta rows
+  carry just the change, reconstructable offline by replaying in `seq` order.
+  Heavy — storing the full feed filled the volume in minutes, which is why
+  `topbook` is the default.
+
+Tables:
+- **`orderbook_events`** — `recv_ts`, `exch_ts`, `ticker`, `sid`, `seq`,
+  `msg_type` (`book` in topbook mode; `snapshot`/`delta` in full mode),
+  top-of-book `best_yes_bid` / `best_yes_ask`, and level arrays `yes_levels` /
+  `no_levels` JSONB (`[[price_cents, qty], …]`). In topbook mode each row is a
+  self-contained near-touch snapshot (no replay needed).
+- **`trades`** — one row per print (always recorded, both modes): prices in
+  cents, `count`, `taker_side`, raw payload.
 
 Prices are normalised to integer cents in `[1, 99]`; a YES ask at price `p`
 equals a NO bid at `100 − p`, so both raw sides are stored losslessly and asks
@@ -81,9 +89,11 @@ the last exported id per table). Add `--prune` to delete already-exported rows
 from Postgres and keep the volume bounded. Full steps in `DEPLOY.md` Part 2.
 
 ## Cost / data sizing
-~9k order-book events + ~350 trades per **30 s** across the full MLB slate
-(observed). Plan for a few hundred MB/day in Postgres; `export_pg.py` pulls it
-down to local Parquet so the long-term copy lives on your machine.
+Default `topbook` mode: ~150 top-of-book rows + ~175 trades per **20 s** across
+the full MLB slate (observed) — well under ~1 GB/day, comfortable on a small
+volume for the whole run. `full` mode is ~30× heavier (multiple GB/day) and
+needs frequent pruning. Either way `export_pg.py` pulls data down to local
+Parquet (add `--prune` to bound the volume).
 
 ## Résumé framing
 > Engineered a tick-level order-book data pipeline ingesting Kalshi prediction

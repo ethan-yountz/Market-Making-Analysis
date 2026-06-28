@@ -59,6 +59,72 @@ def test_empty_book_has_no_top():
     assert b.mid is None and b.spread is None
 
 
+def test_side_window_keeps_near_touch_only():
+    b = OrderBook("MKT")
+    b.apply_snapshot({
+        "yes_dollars_fp": [["0.5000", "10.00"], ["0.4800", "5.00"], ["0.4400", "9.00"]],
+        "no_dollars_fp": [],
+    })
+    # best yes bid = 50, depth 5 -> keep >= 45: levels 48 and 50, drop 44
+    assert b.side_window("yes", 5) == [[48, 5.0], [50, 10.0]]
+    assert b.side_window("no", 5) == []
+
+
+def test_topbook_writes_only_on_touch_move():
+    from kalshi_mm.recorder.lob_recorder import LobRecorder
+
+    events: list[dict] = []
+
+    class FakeSink:
+        rows_written = 0
+
+        def write_orderbook_event(self, ev):
+            events.append(ev)
+
+        def write_trade(self, tr):
+            pass
+
+        def flush(self):
+            pass
+
+    rec = LobRecorder(auth=None, sink=FakeSink(), mode="topbook", depth_cents=5)
+    # snapshot: best yes bid 50, best no bid 48 -> best yes ask 52 -> first row
+    rec._handle(json.dumps({
+        "type": "orderbook_snapshot", "sid": 1, "seq": 1,
+        "msg": {"market_ticker": "M",
+                "yes_dollars_fp": [["0.5000", "10.00"], ["0.4900", "5.00"]],
+                "no_dollars_fp": [["0.4800", "7.00"]]},
+    }))
+    assert len(events) == 1 and events[0]["msg_type"] == "book"
+    assert events[0]["best_yes_bid"] == 50 and events[0]["best_yes_ask"] == 52
+
+    # deep delta (1c) -> touch unchanged -> no row
+    rec._handle(json.dumps({
+        "type": "orderbook_delta", "sid": 1, "seq": 2,
+        "msg": {"market_ticker": "M", "price_dollars": "0.0100",
+                "delta_fp": "100.00", "side": "yes"},
+    }))
+    assert len(events) == 1
+
+    # size change at an existing in-window level (49) that doesn't move the
+    # touch -> still no row
+    rec._handle(json.dumps({
+        "type": "orderbook_delta", "sid": 1, "seq": 3,
+        "msg": {"market_ticker": "M", "price_dollars": "0.4900",
+                "delta_fp": "3.00", "side": "yes"},
+    }))
+    assert len(events) == 1
+
+    # new best yes bid at 51 -> touch moves -> new row, window captured
+    rec._handle(json.dumps({
+        "type": "orderbook_delta", "sid": 1, "seq": 4,
+        "msg": {"market_ticker": "M", "price_dollars": "0.5100",
+                "delta_fp": "4.00", "side": "yes"},
+    }))
+    assert len(events) == 2 and events[1]["best_yes_bid"] == 51
+    assert [51, 4.0] in events[1]["yes_levels"]
+
+
 def test_sqlite_sink_roundtrip(tmp_path):
     sink = SqliteSink(tmp_path / "lob.sqlite")
     sink.write_orderbook_event({

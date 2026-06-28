@@ -68,6 +68,17 @@ class OrderBook:
     def no_levels(self) -> list[list]:
         return [[p, self.no[p]] for p in sorted(self.no)]
 
+    def side_window(self, side: str, depth_cents: int) -> list[list]:
+        """Near-touch levels on one side: from the best price down to
+        ``best - depth_cents``, as ``[[price_cents, qty], …]`` ascending. Empty
+        if the side is empty. This is what the lighter ``topbook`` recording
+        mode stores — all the fill model needs around the spread."""
+        book = self.yes if side == "yes" else self.no
+        if not book:
+            return []
+        cutoff = max(book) - depth_cents
+        return [[p, book[p]] for p in sorted(book) if p >= cutoff]
+
     @property
     def best_yes_bid(self) -> int | None:
         return max(self.yes) if self.yes else None
