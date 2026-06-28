@@ -1,7 +1,7 @@
 # Deploy the Order-Book Logger (go-live guide)
 
-Step-by-step to get the Kalshi L2 logger collecting data 24/7 on Railway, with
-nightly backups to Cloudflare R2. Architecture and internals are in
+Step-by-step to get the Kalshi L2 logger collecting data 24/7 on Railway, then
+pull the data down to your machine as Parquet. Architecture and internals are in
 [docs/RECORDER.md](docs/RECORDER.md).
 
 > **Heads up — credentials are not in this repo.** `secrets/` is gitignored, so
@@ -92,16 +92,15 @@ It's now recording the full MLB slate until you stop it.
 
 ---
 
-## Part 2 — Get the data somewhere durable (pick ONE)
+## Part 2 — Get the data onto your machine
 
 Postgres on Railway is one fixed-size volume and a single point of failure, so
-get the data off it. Two options — the first is far less setup.
+pull the data off it onto your laptop — where you'll use it anyway. No extra
+services: run this whenever you remember, and once at the end of collection.
 
-### Option A (recommended for a short run) — pull to local Parquet
-No extra services, no Cloudflare. Run from your laptop whenever, and once at the
-end of collection.
 1. Railway → **Postgres service → Connect tab** → copy the **Public Network**
-   connection URL (host looks like `xxx.proxy.rlwy.net:PORT`).
+   connection URL (host looks like `xxx.proxy.rlwy.net:PORT`). The internal
+   `DATABASE_URL` only works inside Railway; you need the public one from here.
 2. Export to local Parquet — incremental, so re-running only fetches new rows:
    ```powershell
    $env:DATABASE_URL = "postgresql://postgres:PASS@xxx.proxy.rlwy.net:PORT/railway"
@@ -114,27 +113,9 @@ end of collection.
    python scripts/export_pg.py --prune
    ```
 
-### Option B (set-and-forget) — nightly backup to Cloudflare R2
-
-### 6. In Cloudflare
-- Create an R2 bucket (e.g. `kalshi-lob`).
-- Create an **R2 API Token**; note the **Access Key ID**, **Secret Access Key**,
-  and your S3 endpoint `https://<account-id>.r2.cloudflarestorage.com`.
-
-### 7. In Railway — add a cron service
-- **New → GitHub Repo** (same repo) to add a second service.
-- **Settings → Deploy → Custom Start Command:** `python scripts/backup_to_r2.py`
-- **Settings → Cron Schedule:** `0 9 * * *` (daily 09:00 UTC)
-- **Variables:** the `DATABASE_URL` reference (as in step 3) plus:
-  | Variable | Value |
-  |---|---|
-  | `R2_ENDPOINT_URL` | `https://<account-id>.r2.cloudflarestorage.com` |
-  | `R2_ACCESS_KEY_ID` | from the R2 token |
-  | `R2_SECRET_ACCESS_KEY` | from the R2 token |
-  | `R2_BUCKET` | `kalshi-lob` |
-
-Ships only new rows each night (tracked in a `backup_state` table) as zstd
-Parquet — idempotent, so re-runs never duplicate.
+> It's manual, so set a reminder every few days — and definitely export before
+> tearing down the Railway project. Kalshi has no historical order book, so a
+> missed window can't be backfilled.
 
 ---
 
@@ -146,8 +127,7 @@ python scripts/probe_ws.py          # sanity-check auth + live feed any time
 
 ## Worth knowing
 - **Cost:** a small worker + Postgres on Railway is ~a few $/month (usage-based).
-  R2 has no egress fees, so backups stay cheap.
-- **Storage growth:** ~hundreds of MB/day in Postgres. Once R2 backups are
-  confirmed, a retention prune on the Postgres tables can keep it bounded.
+- **Storage growth:** ~hundreds of MB/day in Postgres. Run `export_pg.py --prune`
+  after an export to keep the volume bounded.
 - **Don't sleep the machine** only matters for the *local* run — the hosted
   Railway worker runs continuously.

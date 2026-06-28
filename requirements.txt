@@ -1,8 +1,6 @@
-# Runtime deps for the hosted order-book logger + nightly R2 backup.
+# Runtime deps for the hosted order-book logger on Railway.
 # (Research/modelling deps live in pyproject.toml; the logger needs only these.)
 websockets>=12
 requests>=2.31
 cryptography>=42
 psycopg2-binary>=2.9
-pyarrow>=14
-boto3>=1.34

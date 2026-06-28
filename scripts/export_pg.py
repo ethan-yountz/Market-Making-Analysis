@@ -1,6 +1,6 @@
-"""Pull logged data off (Railway) Postgres into local Parquet — the lightweight
-alternative to the R2 cron. Run it from your laptop whenever you like and once
-at the end of collection; the data ends up durably on your own disk.
+"""Pull logged data off (Railway) Postgres into local Parquet. Run it from your
+laptop whenever you like and once at the end of collection; the data ends up
+durably on your own disk.
 
 Incremental: a local state file (``_export_state.json`` in the output dir) tracks
 the last exported row id per table, so re-runs only fetch new rows.

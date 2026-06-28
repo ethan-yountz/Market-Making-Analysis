@@ -7,19 +7,14 @@ high-fidelity backtests, we record the live book ourselves.
 
 ```
         ┌──────────────────── Railway ────────────────────┐
-        │                                                  │
         │   ┌──────────────────┐      ┌────────────────┐   │
         │   │  Logger process  │────▶ │ Postgres addon │   │
-        │   │   (WebSocket)    │      │   ~5–15 GB     │   │
+        │   │   (WebSocket)    │      │                │   │
         │   └──────────────────┘      └────────────────┘   │
-        │                                     │            │
-        │   ┌──────────────────┐              │            │
-        │   │  Nightly backup  │ ◀────────────┘            │
-        │   │   (cron job)     │                           │
-        │   └──────────────────┘                           │
-        └───────────│──────────────────────────────────────┘
-                    ▼
-            Cloudflare R2  (Parquet, free egress)
+        └─────────────────────────────────│────────────────┘
+                                          │  export_pg.py
+                                          ▼  (public URL)
+                            Local Parquet  (data/lob_export/)
 ```
 
 ## What it records
@@ -58,7 +53,7 @@ python scripts/record_lob.py --series KXMLBGAME --horizon-hours 24
 Credentials come from `secrets/kalshi_key_id.txt` + `secrets/kalshi_private_key.pem`.
 Verify the feed any time with `python scripts/probe_ws.py`.
 
-## Deploy on Railway (host it tonight)
+## Deploy on Railway
 
 1. **Create the project & Postgres**
    - `railway init` (or create a project in the dashboard), then add the
@@ -75,18 +70,17 @@ Verify the feed any time with `python scripts/probe_ws.py`.
 4. **Watch the logs** — you should see `subscribed ['orderbook_delta','trade']
    x N markets` and a per-minute `alive: … rows written …` heartbeat.
 
-### Nightly backup to Cloudflare R2
-Add a **cron service** (or a second service with a schedule, e.g. `0 9 * * *`)
-running `python scripts/backup_to_r2.py`, with these variables set:
-`R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
-(see `.env.example`). It exports only new rows (tracked in a `backup_state`
-table) to zstd Parquet partitioned by table and date — idempotent and
-incremental.
+### Get the data onto your machine
+Run `python scripts/export_pg.py` from your laptop against Railway's **public**
+Postgres URL (Postgres service → Connect tab). It pulls new rows into local
+zstd Parquet under `data/lob_export/`, incrementally (a local state file tracks
+the last exported id per table). Add `--prune` to delete already-exported rows
+from Postgres and keep the volume bounded. Full steps in `DEPLOY.md` Part 2.
 
 ## Cost / data sizing
 ~9k order-book events + ~350 trades per **30 s** across the full MLB slate
-(observed). Plan for a few hundred MB/day in Postgres; the nightly Parquet
-copy to R2 keeps long-term storage cheap and durable.
+(observed). Plan for a few hundred MB/day in Postgres; `export_pg.py` pulls it
+down to local Parquet so the long-term copy lives on your machine.
 
 ## Résumé framing
 > Engineered a tick-level order-book data pipeline ingesting Kalshi prediction
