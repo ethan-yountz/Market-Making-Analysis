@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from kalshi_mm.api.client import load_default_auth
 from kalshi_mm.recorder.lob_recorder import MLB, LobRecorder
-from kalshi_mm.recorder.storage import make_sink
+from kalshi_mm.recorder.storage import is_hosted_without_db, make_sink
 
 
 def main() -> None:
@@ -40,6 +40,11 @@ def main() -> None:
                          "full: full snapshots + every delta (heavy)")
     ap.add_argument("--depth-cents", type=int, default=5,
                     help="topbook: cents around the touch to record per side")
+    ap.add_argument("--allow-sqlite", action="store_true",
+                    help="permit the local SQLite fallback even on a hosted "
+                         "platform (otherwise the logger refuses to start "
+                         "without DATABASE_URL, since container SQLite is wiped "
+                         "on restart)")
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -51,7 +56,22 @@ def main() -> None:
     auth = load_default_auth()
     if auth is None:
         logging.warning("no API credentials found - websocket will likely be rejected")
+
+    if is_hosted_without_db(args.db_url) and not args.allow_sqlite:
+        logging.error(
+            "DATABASE_URL is not set but this looks like a hosted (Railway) deploy. "
+            "Refusing to start: the SQLite fallback writes to container-local "
+            "storage that is WIPED on every restart, so you'd collect nothing "
+            "durable. Fix: add a DATABASE_URL reference to this service "
+            "(Variables -> Add Reference -> Postgres -> DATABASE_URL). "
+            "Pass --allow-sqlite only if you really want ephemeral local storage."
+        )
+        raise SystemExit(2)
+
     sink = make_sink(args.db_url)
+    if not args.db_url:
+        logging.warning("no DATABASE_URL - using local SQLite at data/lob.sqlite "
+                        "(fine locally; ephemeral on hosted platforms)")
     logging.info("mode=%s depth=%dc, storage sink: %s",
                  args.mode, args.depth_cents, type(sink).__name__)
 

@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 import time
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -301,3 +303,14 @@ def make_sink(url: str | None) -> Sink:
     if low.startswith("sqlite:///"):
         return SqliteSink(url[len("sqlite:///"):])
     return SqliteSink(url)
+
+
+def is_hosted_without_db(db_url: str | None, env: Mapping[str, str] | None = None) -> bool:
+    """True when we look like a hosted deploy (Railway sets ``RAILWAY_*`` vars)
+    but no Postgres URL is configured — the case where falling back to ephemeral
+    SQLite would silently lose data on every restart. The CLI uses this to refuse
+    to start instead of quietly mis-recording."""
+    if db_url:
+        return False
+    env = os.environ if env is None else env
+    return any(k.startswith("RAILWAY_") for k in env)

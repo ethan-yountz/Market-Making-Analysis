@@ -4,7 +4,7 @@ format captured from the live feed (dollar-string prices, fixed-point qtys)."""
 import json
 
 from kalshi_mm.recorder.book import OrderBook, price_to_cents
-from kalshi_mm.recorder.storage import SqliteSink
+from kalshi_mm.recorder.storage import SqliteSink, is_hosted_without_db
 
 
 def test_price_to_cents_exact():
@@ -57,6 +57,15 @@ def test_empty_book_has_no_top():
     b = OrderBook("MKT")
     assert b.best_yes_bid is None and b.best_yes_ask is None
     assert b.mid is None and b.spread is None
+
+
+def test_is_hosted_without_db():
+    # a configured DB url is never flagged, even on a hosted platform
+    assert is_hosted_without_db("postgres://x", {"RAILWAY_ENVIRONMENT": "production"}) is False
+    # hosted (RAILWAY_*) with no DB url -> the ephemeral-SQLite trap -> flagged
+    assert is_hosted_without_db(None, {"RAILWAY_ENVIRONMENT": "production"}) is True
+    # local with no DB url -> SQLite is fine, not flagged
+    assert is_hosted_without_db(None, {"HOME": "/home/me"}) is False
 
 
 def test_side_window_keeps_near_touch_only():
