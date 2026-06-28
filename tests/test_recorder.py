@@ -88,3 +88,24 @@ def test_sqlite_sink_roundtrip(tmp_path):
     assert json.loads(yl) == [[50, 20.0]]
     conn.close()
     sink.close()
+
+
+def test_sqlite_sink_delta_stores_null_levels(tmp_path):
+    # Delta rows omit the full book (null level arrays) to keep storage small;
+    # only the compact delta payload is kept for offline replay.
+    sink = SqliteSink(tmp_path / "lob.sqlite")
+    sink.write_orderbook_event({
+        "recv_ts": 1.0, "exch_ts": None, "ticker": "MKT", "sid": 1, "seq": 2,
+        "msg_type": "delta", "yes_levels": None, "no_levels": None,
+        "best_yes_bid": 50, "best_yes_ask": 51,
+        "delta": {"side": "yes", "price_dollars": "0.5000", "delta_fp": "5.00"},
+    })
+    sink.close()
+    import sqlite3
+
+    conn = sqlite3.connect(str(tmp_path / "lob.sqlite"))
+    yl, nl, delta = conn.execute(
+        "SELECT yes_levels, no_levels, delta FROM orderbook_events").fetchone()
+    assert yl is None and nl is None
+    assert json.loads(delta)["side"] == "yes"
+    conn.close()

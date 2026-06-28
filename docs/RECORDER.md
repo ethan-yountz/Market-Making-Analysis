@@ -23,10 +23,13 @@ For each active game market it subscribes to `orderbook_delta` + `trade`,
 maintains a local book by applying the snapshot + deltas, and writes:
 
 - **`orderbook_events`** — one row per book change: `recv_ts`, `exch_ts`,
-  `ticker`, `sid`, `seq`, `msg_type` (`snapshot`/`delta`), the **full
-  reconstructed book** as `yes_levels` / `no_levels` JSONB (`[[price_cents,
-  qty], …]`), top-of-book `best_yes_bid` / `best_yes_ask`, and the raw `delta`
-  for audit.
+  `ticker`, `sid`, `seq`, `msg_type` (`snapshot`/`delta`), and top-of-book
+  `best_yes_bid` / `best_yes_ask`. **Snapshot** rows carry the full book in
+  `yes_levels` / `no_levels` JSONB (`[[price_cents, qty], …]`); **delta** rows
+  carry only the `delta` payload (side, price, signed size) and leave the level
+  arrays null. Replay deltas onto the last snapshot (in `seq` order) to rebuild
+  the book at any instant — storing the whole book on every delta filled the
+  volume in minutes.
 - **`trades`** — one row per print: prices in cents, `count`, `taker_side`,
   raw payload.
 

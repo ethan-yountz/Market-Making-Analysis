@@ -189,8 +189,12 @@ class LobRecorder:
             "sid": msg.get("sid"),
             "seq": msg.get("seq"),
             "msg_type": "snapshot" if snapshot else "delta",
-            "yes_levels": book.yes_levels(),
-            "no_levels": book.no_levels(),
+            # Full book only on snapshots; delta rows store just the change.
+            # Reconstruct the book offline by replaying deltas (in seq order)
+            # onto the last snapshot. Writing the whole book on every delta
+            # filled the Postgres volume within minutes.
+            "yes_levels": book.yes_levels() if snapshot else None,
+            "no_levels": book.no_levels() if snapshot else None,
             "best_yes_bid": book.best_yes_bid,
             "best_yes_ask": book.best_yes_ask,
             "delta": None if snapshot else inner,

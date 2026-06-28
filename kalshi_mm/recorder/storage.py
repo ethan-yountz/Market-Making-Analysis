@@ -52,8 +52,8 @@ CREATE TABLE IF NOT EXISTS orderbook_events (
     sid           INTEGER,
     seq           BIGINT,
     msg_type      TEXT NOT NULL,
-    yes_levels    JSONB NOT NULL,
-    no_levels     JSONB NOT NULL,
+    yes_levels    JSONB,
+    no_levels     JSONB,
     best_yes_bid  INTEGER,
     best_yes_ask  INTEGER,
     delta         JSONB
@@ -98,7 +98,9 @@ class PostgresSink(Sink):
         J = self._Json
         self._ob.append((
             _dt(ev["recv_ts"]), ev.get("exch_ts"), ev["ticker"], ev.get("sid"),
-            ev.get("seq"), ev["msg_type"], J(ev["yes_levels"]), J(ev["no_levels"]),
+            ev.get("seq"), ev["msg_type"],
+            J(ev["yes_levels"]) if ev.get("yes_levels") is not None else None,
+            J(ev["no_levels"]) if ev.get("no_levels") is not None else None,
             ev.get("best_yes_bid"), ev.get("best_yes_ask"),
             J(ev["delta"]) if ev.get("delta") is not None else None,
         ))
@@ -159,7 +161,7 @@ CREATE TABLE IF NOT EXISTS orderbook_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     recv_ts TEXT NOT NULL, exch_ts TEXT, ticker TEXT NOT NULL,
     sid INTEGER, seq INTEGER, msg_type TEXT NOT NULL,
-    yes_levels TEXT NOT NULL, no_levels TEXT NOT NULL,
+    yes_levels TEXT, no_levels TEXT,
     best_yes_bid INTEGER, best_yes_ask INTEGER, delta TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_ob_ticker_ts ON orderbook_events (ticker, recv_ts);
@@ -192,8 +194,10 @@ class SqliteSink(Sink):
     def write_orderbook_event(self, ev: dict[str, Any]) -> None:
         self._ob.append((
             self._iso(ev["recv_ts"]), ev.get("exch_ts"), ev["ticker"], ev.get("sid"),
-            ev.get("seq"), ev["msg_type"], json.dumps(ev["yes_levels"]),
-            json.dumps(ev["no_levels"]), ev.get("best_yes_bid"), ev.get("best_yes_ask"),
+            ev.get("seq"), ev["msg_type"],
+            json.dumps(ev["yes_levels"]) if ev.get("yes_levels") is not None else None,
+            json.dumps(ev["no_levels"]) if ev.get("no_levels") is not None else None,
+            ev.get("best_yes_bid"), ev.get("best_yes_ask"),
             json.dumps(ev["delta"]) if ev.get("delta") is not None else None,
         ))
         if len(self._ob) >= _BATCH:
