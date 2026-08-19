@@ -62,7 +62,7 @@ python scripts/record_lob.py --series KXMLBGAME --horizon-hours 24
 ```
 
 Credentials come from `secrets/kalshi_key_id.txt` + `secrets/kalshi_private_key.pem`.
-Verify the feed any time with `python scripts/probe_ws.py`.
+Verify the feed any time with `python scripts/check_ws_connection.py`.
 
 ## Deploy on Railway
 

@@ -37,7 +37,7 @@ rotate or if you've lost the private key.
 
   `secrets/` is gitignored — **never commit it.** Verify the key loads:
   ```bash
-  python scripts/probe_ws.py          # should print "auth: loaded" + live messages
+  python scripts/check_ws_connection.py  # should print "auth: loaded" + live messages
   ```
 - *Railway* — paste the same two values into the `KALSHI_API_KEY_ID` /
   `KALSHI_PRIVATE_KEY` variables in Part 1, step 4 (no `secrets/` folder needed
@@ -122,7 +122,7 @@ services: run this whenever you remember, and once at the end of collection.
 ## Run it locally instead (no cloud)
 ```bash
 python scripts/record_lob.py        # writes to data/lob.sqlite, zero config
-python scripts/probe_ws.py          # sanity-check auth + live feed any time
+python scripts/check_ws_connection.py  # sanity-check auth + live feed any time
 ```
 
 ## Worth knowing

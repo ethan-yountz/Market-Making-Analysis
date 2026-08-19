@@ -4,8 +4,8 @@ Connects, subscribes to orderbook_delta + trade for a few active MLB markets,
 prints the first messages and message-type counts, then exits. Use this to
 confirm the logger will collect data before deploying.
 
-    python scripts/probe_ws.py
-    python scripts/probe_ws.py --series KXMLBGAME --max-markets 5 --seconds 20
+    python scripts/check_ws_connection.py
+    python scripts/check_ws_connection.py --series KXMLBGAME --max-markets 5 --seconds 20
 """
 
 from __future__ import annotations
