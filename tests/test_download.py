@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
-from kalshi_mm.api.download import discover_markets
+import pandas as pd
+
+from kalshi_mm.api.download import discover_markets, download_season
 
 
 class _MarketClient:
@@ -13,6 +15,23 @@ class _MarketClient:
 
     def get_historical_markets(self, **_kwargs):
         return iter(self.historical)
+
+
+class _DownloadClient(_MarketClient):
+    def get_historical_cutoff(self):
+        return {"market_settled_ts": "2025-01-01T00:00:00Z"}
+
+    def get_historical_candlesticks(self, *_args, **_kwargs):
+        return []
+
+    def get_candlesticks(self, *_args, **_kwargs):
+        return []
+
+    def get_historical_trades(self, **_kwargs):
+        return iter(())
+
+    def get_trades(self, *_args, **_kwargs):
+        return iter(())
 
 
 def _market(ticker: str, close_time: str) -> dict:
@@ -43,3 +62,28 @@ def test_discovery_enforces_close_time_window_client_side():
     )
 
     assert result["ticker"].tolist() == ["IN-WINDOW"]
+
+
+def test_download_season_applies_explicit_market_limit(tmp_path):
+    client = _DownloadClient(
+        live=[
+            _market("FIRST", "2024-11-01T00:00:00Z"),
+            _market("SECOND", "2024-11-02T00:00:00Z"),
+        ],
+        historical=[],
+    )
+
+    manifest = download_season(
+        client,
+        "KXNBAGAME",
+        "nba",
+        "2024-25",
+        datetime(2024, 10, 1, tzinfo=timezone.utc),
+        datetime(2025, 7, 1, tzinfo=timezone.utc),
+        base_dir=tmp_path,
+        market_limit=1,
+    )
+
+    markets = pd.read_parquet(tmp_path / "nba" / "2024-25" / "markets.parquet")
+    assert markets["ticker"].tolist() == ["FIRST"]
+    assert manifest["ticker"].tolist() == ["FIRST"]

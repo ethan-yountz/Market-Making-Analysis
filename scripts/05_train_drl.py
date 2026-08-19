@@ -54,14 +54,14 @@ def main() -> None:
     ap.add_argument("--eta", type=float, default=0.5)
     ap.add_argument("--lambda-inv", type=float, default=0.001)
     ap.add_argument("--inv-level-penalty", type=float, default=0.0005,
-                    help="per-step lambda*inv^2 inventory-level penalty (fix #3)")
+                    help="per-step coefficient applied to squared inventory")
     ap.add_argument("--reward-clip", type=float, default=5.0,
                     help="clip |per-step reward| in cents/contract; stabilizes "
-                         "the DQN against terminal/inventory spikes (fix #1)")
+                         "the DQN against terminal and inventory spikes")
     ap.add_argument("--terminal", choices=["liquidate", "settle", "carry"],
                     default="settle",
                     help="terminal valuation during training; 'settle' removes "
-                         "the artificial liquidation-fee spike (fix #1/#2)")
+                         "the artificial liquidation-fee spike")
     ap.add_argument("--terminal-kappa", type=float, default=0.0)
     ap.add_argument("--frame-stack", type=int, default=32)
     ap.add_argument("--tick-seconds", type=float, default=30.0)

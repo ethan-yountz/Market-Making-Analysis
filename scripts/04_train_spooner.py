@@ -46,7 +46,7 @@ def main() -> None:
     ap.add_argument("--size", type=float, default=100.0)
     ap.add_argument("--eta", type=float, default=0.5)
     ap.add_argument("--inv-level-penalty", type=float, default=0.0005,
-                    help="per-step lambda*inv^2 inventory-level penalty (fix #3)")
+                    help="per-step coefficient applied to squared inventory")
     ap.add_argument("--terminal", choices=["liquidate", "settle", "carry"],
                     default="settle")
     ap.add_argument("--eps0", type=float, default=0.15)

@@ -67,20 +67,7 @@ def main() -> None:
     client = KalshiClient(auth=load_default_auth(), rate_per_s=args.rate)
 
     if args.limit is not None:
-        # Smoke mode: monkeypatch discovery trim via min_volume sort isn't
-        # needed; simplest is to narrow after discovery inside download_season
-        # — handled here by a wrapper that truncates the markets parquet after
-        # the first write would be more invasive, so we just warn.
         logging.info("limit=%d: downloading first markets only", args.limit)
-        import kalshi_mm.api.download as dl
-
-        orig = dl.discover_markets
-
-        def limited(*a, **kw):
-            df = orig(*a, **kw)
-            return df.head(args.limit)
-
-        dl.discover_markets = limited
 
     manifest = download_season(
         client,
@@ -92,6 +79,7 @@ def main() -> None:
         base_dir=args.base_dir,
         candle_lookback_hours=args.lookback_hours,
         min_volume=args.min_volume,
+        market_limit=args.limit,
     )
     if manifest.empty:
         sys.exit("nothing downloaded")

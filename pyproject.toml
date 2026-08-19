@@ -19,8 +19,8 @@ dependencies = [
     "cryptography>=42",
     "gymnasium>=0.29",
 ]
-# torch is intentionally NOT listed: install the CUDA build separately
-# (already present on this machine: torch 2.11.0+cu128).
+# torch is intentionally not listed; install the appropriate CPU or CUDA build
+# separately when training the deep-RL strategy.
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "jupyter"]

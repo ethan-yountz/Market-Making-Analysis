@@ -155,14 +155,20 @@ def download_season(
     base_dir: str | Path = "data/raw",
     candle_lookback_hours: float = 48.0,
     min_volume: float = 0.0,
+    market_limit: int | None = None,
 ) -> pd.DataFrame:
     """Download a full (sport, season). Resumable: tickers already marked done
     in the manifest are skipped. Returns the final manifest."""
+    if market_limit is not None and market_limit <= 0:
+        raise ValueError("market_limit must be positive")
+
     out = Path(base_dir) / sport / season
     (out / "candles").mkdir(parents=True, exist_ok=True)
     (out / "trades").mkdir(parents=True, exist_ok=True)
 
     markets = discover_markets(client, series_ticker, min_close, max_close)
+    if market_limit is not None:
+        markets = markets.head(market_limit).copy()
     if markets.empty:
         log.warning("no markets discovered for %s %s", sport, season)
         return pd.DataFrame()

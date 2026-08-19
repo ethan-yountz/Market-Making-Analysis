@@ -1,5 +1,4 @@
-"""Reward-shaping tests: clipping (DRL stability, fix #1) and the inventory-
-level penalty shared by the DRL and Spooner agents (inventory control, fix #3)."""
+"""Reward-shaping tests for clipping and inventory-level penalties."""
 
 import pandas as pd
 
