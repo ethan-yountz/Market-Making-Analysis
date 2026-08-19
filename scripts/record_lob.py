@@ -1,5 +1,6 @@
-"""Order-book logger entrypoint. Reconstructs the live book and writes one row
-per event to Postgres (production) or SQLite (local default).
+"""Order-book logger entrypoint. Reconstructs the live book and persists
+near-touch updates or replayable events to Postgres (production) or SQLite
+(local default).
 
 Local (zero config -> data/lob.sqlite):
     python scripts/record_lob.py
@@ -24,13 +25,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from kalshi_mm.api.client import load_default_auth
-from kalshi_mm.recorder.lob_recorder import MLB, LobRecorder
+from kalshi_mm.recorder.lob_recorder import DEFAULT_SERIES, LobRecorder
 from kalshi_mm.recorder.storage import is_hosted_without_db, make_sink
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--series", nargs="+", default=list(MLB))
+    ap.add_argument(
+        "--series",
+        "--sports",
+        dest="series",
+        nargs="+",
+        default=list(DEFAULT_SERIES),
+        help="Kalshi series tickers to record (default: KXMLBGAME)",
+    )
     ap.add_argument("--db-url", default=os.environ.get("DATABASE_URL"),
                     help="postgres://... ; defaults to $DATABASE_URL or SQLite")
     ap.add_argument("--horizon-hours", type=float, default=36.0)

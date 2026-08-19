@@ -94,9 +94,3 @@ the full MLB slate (observed) — well under ~1 GB/day, comfortable on a small
 volume for the whole run. `full` mode is ~30× heavier (multiple GB/day) and
 needs frequent pruning. Either way `export_pg.py` pulls data down to local
 Parquet (add `--prune` to bound the volume).
-
-## Résumé framing
-> Engineered a tick-level order-book data pipeline ingesting Kalshi prediction
-> market L2 data via WebSocket across 300+ MLB game lifecycles, implementing
-> delta-based book reconstruction and a calibrated fill-probability model to
-> enable full-season backtesting in the absence of historical LOB data.

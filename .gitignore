@@ -1,6 +1,7 @@
 # Credentials — never commit
 /secrets/
 .env
+.claude/
 
 # Data stores (large, regenerable from API / recorder)
 /data/

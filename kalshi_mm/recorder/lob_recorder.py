@@ -1,9 +1,9 @@
-"""Postgres-backed order-book logger with live book reconstruction.
+"""Persistent order-book logger with live book reconstruction.
 
 Subscribes to ``orderbook_delta`` + ``trade`` for active game markets,
 maintains a local :class:`OrderBook` per market by applying snapshots and
-deltas, and writes one row per event (full reconstructed book) plus one row
-per trade to a :class:`Sink` (Postgres in production, SQLite locally).
+deltas, and writes near-touch snapshots or replayable book events plus every
+trade to a :class:`Sink` (Postgres in production, SQLite locally).
 
 Correctness rules (from Kalshi's protocol, verified against the live feed):
 - ``seq`` is monotonic *per sid* (subscription/channel), spanning all markets
@@ -31,8 +31,8 @@ from kalshi_mm.recorder.storage import Sink
 
 log = logging.getLogger(__name__)
 
-CHANNELS = ["orderbook_delta", "trade"]
-MLB = ("KXMLBGAME",)
+CHANNELS: tuple[str, ...] = ("orderbook_delta", "trade")
+DEFAULT_SERIES: tuple[str, ...] = ("KXMLBGAME",)
 
 
 def _exch_iso(msg: dict) -> str | None:
@@ -51,7 +51,7 @@ class LobRecorder:
         self,
         auth: KalshiAuth | None,
         sink: Sink,
-        series: tuple[str, ...] = MLB,
+        series: tuple[str, ...] = DEFAULT_SERIES,
         horizon_hours: float = 36.0,
         rediscover_minutes: float = 15.0,
         ws_url: str | None = None,

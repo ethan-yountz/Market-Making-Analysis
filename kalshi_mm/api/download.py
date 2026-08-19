@@ -66,6 +66,22 @@ def discover_markets(
             log.warning("%s discovery failed for %s: %s", source, series_ticker, e)
     df = pd.DataFrame(list(rows.values()))
     if not df.empty:
+        # Do not rely solely on server-side filtering.  Kalshi has changed the
+        # behaviour of its live and historical listing endpoints over time,
+        # and an ignored bound would silently contaminate a train/test split.
+        close_times = pd.to_datetime(df["close_time"], utc=True, errors="coerce")
+        in_window = close_times.between(
+            pd.Timestamp(min_close), pd.Timestamp(max_close), inclusive="both"
+        )
+        dropped = int((~in_window).sum())
+        if dropped:
+            log.warning(
+                "discarded %d markets outside requested close-time window [%s, %s]",
+                dropped,
+                min_close.isoformat(),
+                max_close.isoformat(),
+            )
+        df = df.loc[in_window].copy()
         df = df.sort_values("close_time").reset_index(drop=True)
     return df
 

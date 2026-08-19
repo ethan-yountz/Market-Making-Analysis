@@ -23,6 +23,7 @@ from kalshi_mm.data.build import iter_games
 from kalshi_mm.eval import plots
 from kalshi_mm.eval.metrics import aggregate, summary_table
 from kalshi_mm.sim.engine import EngineConfig, run_game
+from kalshi_mm.sim.fees import MAKER_RATE, TAKER_RATE, FeeSchedule
 from kalshi_mm.sim.fills import FillConfig, IntensityModel
 from kalshi_mm.strategies.avellaneda_stoikov import AvellanedaStoikovMM
 from kalshi_mm.strategies.fixed_spread import FixedSpreadMM
@@ -66,6 +67,12 @@ def main() -> None:
                     help="value leftover inventory at tip: cross out (liquidate), "
                          "hold to the realized outcome fee-free (settle), or mark "
                          "at last mid (carry)")
+    ap.add_argument("--maker-rate", type=float, default=MAKER_RATE,
+                    help="maker fee rate. Kalshi game markets charge %.4f "
+                         "(fee_type=quadratic_with_maker_fees); pass 0 to model "
+                         "a rebated Liquidity-Provider regime. Use a separate "
+                         "--out-dir per rate to keep both result sets." % MAKER_RATE)
+    ap.add_argument("--taker-rate", type=float, default=TAKER_RATE)
     ap.add_argument("--out-dir", default="results")
     ap.add_argument("--base-dir", default="data/raw")
     args = ap.parse_args()
@@ -90,6 +97,10 @@ def main() -> None:
     if not games:
         sys.exit("no games - run 01_download.py first")
 
+    fees = FeeSchedule(maker_rate=args.maker_rate, taker_rate=args.taker_rate)
+    logging.info("fees: maker_rate=%.4f taker_rate=%.4f | terminal=%s",
+                 args.maker_rate, args.taker_rate, args.terminal)
+
     out = Path(args.out_dir) / f"{args.sport}_{args.season}"
     out.mkdir(parents=True, exist_ok=True)
 
@@ -100,7 +111,7 @@ def main() -> None:
         for g in games:
             results.append(
                 run_game(
-                    g, strat,
+                    g, strat, fees=fees,
                     fill_config=FillConfig(rho=args.rho, latent=args.latent, seed=11),
                     intensity=intensity,
                     config=EngineConfig(terminal_mode=args.terminal),
