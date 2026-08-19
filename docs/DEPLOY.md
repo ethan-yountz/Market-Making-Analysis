@@ -2,7 +2,7 @@
 
 Step-by-step to get the Kalshi L2 logger collecting data 24/7 on Railway, then
 pull the data down to your machine as Parquet. Architecture and internals are in
-[docs/RECORDER.md](docs/RECORDER.md).
+[RECORDER.md](RECORDER.md).
 
 > **Heads up — credentials are not in this repo.** `secrets/` is gitignored, so
 > on a fresh machine you won't have the key files. You only need the *values*:
