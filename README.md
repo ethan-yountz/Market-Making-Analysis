@@ -44,19 +44,13 @@ recorded L2 data is used to validate the backtest's queue and depth assumptions.
 ## Fill probability model
 
 Kalshi exposes historical one-minute bid/ask candles and the trade tape, but
-not historical depth or queue position. The simulator therefore combines two
-fill mechanisms:
-
-1. **Tape-anchored fills.** A trade through the strategy's quote fills the
-   quote; a trade at a joined touch fills a configurable queue share `rho`;
-   a trade at a price-improving quote fills it before the old touch. These
-   fills are tied directly to observed market activity.
-2. **Latent fill probability (optional).** A price-improving quote may attract
-   flow that did not occur in the historical tape. The model estimates an
-   incremental arrival intensity `lambda` from observed trade rates by quote
-   distance and time to tip. Over an interval `dt`, the probability of a fill
-   is `1 - exp(-lambda * dt)`. Synthetic volume is capped to limit
-   extrapolation.
+not historical depth or queue position. The backtester therefore anchors fills
+to observed trades: volume through a quote fills it, volume at a joined touch
+allocates a configurable queue share `rho`, and a price-improving quote is
+treated as first in queue. To model additional flow that a better quote might
+have attracted, an optional capped Poisson model estimates arrival intensity
+`lambda` by quote distance and time to tip, giving fill probability
+`1 - exp(-lambda * dt)` over interval `dt`.
 
 ## PnL accounting
 
